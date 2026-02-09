@@ -1,0 +1,14 @@
+name: Deploy API BACKEND to MAIN
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      # Add your deployment steps here
+      
