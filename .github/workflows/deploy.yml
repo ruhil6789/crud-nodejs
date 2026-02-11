@@ -23,4 +23,5 @@ jobs:
           script: |
             cd /home/ubuntu/crud-nodejs
             git pull origin qa
-            docker compose up -d --build
+            docker-compose down
+            docker-compose up -d --build
