@@ -23,7 +23,7 @@ jobs:
           key: ${{ secrets.EC2_SSH_KEY }}
           port: ${{ secrets.EC2_PORT }}
           script: |
-            cd /home/ubuntu/app
+            cd /home/ubuntu/crud-nodejs
             git pull origin main
             docker compose up -d --build || pm2 restart app
       
