@@ -1,16 +1,14 @@
-name: Deploy API BACKEND to MAIN
+name: Deploy API BACKEND to QA
 
 on:
   push:
     branches:
-      # - master
       - qa
 
 jobs:
   deploy:
     runs-on: ubuntu-latest
 
-    
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -21,9 +19,8 @@ jobs:
           host: ${{ secrets.EC2_HOST }}
           username: ${{ secrets.EC2_USER }}
           key: ${{ secrets.EC2_SSH_KEY }}
-          port: ${{ secrets.EC2_PORT }}
+          port: 22
           script: |
             cd /home/ubuntu/crud-nodejs
-            git pull origin main
-            docker compose up -d --build || pm2 restart app
-      
+            git pull origin qa
+            docker compose up -d --build
