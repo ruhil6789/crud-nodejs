@@ -3,8 +3,8 @@ name: Deploy API BACKEND to MAIN
 on:
   push:
     branches:
-      - main
-      # - qa
+      # - master
+      - qa
 
 jobs:
   deploy:
