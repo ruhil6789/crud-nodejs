@@ -5,7 +5,7 @@ services:
       dockerfile: Dockerfile
     restart: unless-stopped
     ports:
-      - "3003:3002"
+      - "3002:3002"
     environment:
       - PORT=3002
       - MONGODB_URI=mongodb://mongo:27017/crud-app
@@ -13,7 +13,7 @@ services:
       - REDIS_PORT=6379
       - RATE_LIMIT_WINDOW_MS=900000
       - RATE_LIMIT_MAX_REQUESTS=100
-      - NODE_ENV=production
+      - NODE_ENV=development
     depends_on:
       mongo:
         condition: service_healthy
