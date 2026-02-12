@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>WhatsApp-like Chat - Test Client</title>
+  <style>
+    * { box-sizing: border-box; }
+    body { font-family: system-ui, sans-serif; margin: 0; padding: 20px; background: #1a1a2e; color: #eee; }
+    .container { max-width: 600px; margin: 0 auto; }
+    h1 { color: #00d4ff; }
+    .section { background: #16213e; padding: 16px; border-radius: 8px; margin-bottom: 16px; }
+    input, textarea, button { padding: 10px; margin: 4px; border-radius: 4px; border: 1px solid #0f3460; }
+    input, textarea { background: #0f3460; color: #eee; width: 100%; }
+    button { background: #e94560; color: white; border: none; cursor: pointer; }
+    button:hover { background: #ff6b6b; }
+    .log { background: #0f3460; padding: 12px; border-radius: 4px; max-height: 300px; overflow-y: auto; font-family: monospace; font-size: 12px; }
+    .log div { margin: 4px 0; }
+    .status { padding: 8px; border-radius: 4px; margin-bottom: 12px; }
+    .status.connected { background: #00c853; color: #000; }
+    .status.disconnected { background: #ff5252; color: #fff; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>🔌 WhatsApp-like Chat - WebSocket Test</h1>
+
+    <div class="section">
+      <h3>Connection</h3>
+      <div id="status" class="status disconnected">Disconnected</div>
+      <input type="text" id="userId" placeholder="User ID (MongoDB ObjectId)" value="">
+      <input type="text" id="deviceId" placeholder="Device ID (optional)" value="web-client">
+      <button onclick="connect()">Connect</button>
+      <button onclick="disconnect()">Disconnect</button>
+    </div>
+
+    <div class="section">
+      <h3>Create Chat</h3>
+      <input type="text" id="createParticipants" placeholder='Participant IDs (comma-separated)' value="">
+      <input type="text" id="chatName" placeholder="Chat name" value="">
+      <button onclick="createChat()">Create Chat</button>
+    </div>
+
+    <div class="section">
+      <h3>Send Message</h3>
+      <input type="text" id="sendChatId" placeholder="Chat ID" value="">
+      <textarea id="messageContent" placeholder="Message" rows="2"></textarea>
+      <button onclick="sendMessage()">Send Message</button>
+    </div>
+
+    <div class="section">
+      <h3>Get Undelivered Messages</h3>
+      <button onclick="getUndelivered()">Fetch Offline Messages</button>
+    </div>
+
+    <div class="section">
+      <h3>Event Log</h3>
+      <div id="log" class="log"></div>
+    </div>
+  </div>
+
+  <script src="/socket.io/socket.io.js"></script>
+  <script>
+    const API_BASE = window.location.origin;
+    let socket = null;
+
+    function log(msg, type = 'info') {
+      const el = document.getElementById('log');
+      const div = document.createElement('div');
+      div.textContent = `[${new Date().toLocaleTimeString()}] ${msg}`;
+      div.style.color = type === 'error' ? '#ff6b6b' : type === 'success' ? '#00c853' : '#aaa';
+      el.appendChild(div);
+      el.scrollTop = el.scrollHeight;
+    }
+
+    function updateStatus(connected) {
+      const el = document.getElementById('status');
+      el.textContent = connected ? 'Connected' : 'Disconnected';
+      el.className = 'status ' + (connected ? 'connected' : 'disconnected');
+    }
+
+    function connect() {
+      const userId = document.getElementById('userId').value.trim();
+      const deviceId = document.getElementById('deviceId').value.trim() || 'web-client';
+      if (!userId) { log('Please enter a User ID', 'error'); return; }
+
+      if (socket) socket.disconnect();
+      socket = io(API_BASE, {
+        auth: { userId, deviceId },
+        transports: ['websocket', 'polling']
+      });
+
+      socket.on('connect', () => { updateStatus(true); log('Connected', 'success'); });
+      socket.on('disconnect', () => { updateStatus(false); log('Disconnected'); });
+      socket.on('connect_error', (err) => { log('Connection error: ' + err.message, 'error'); });
+
+      socket.on('chatUpdate', (data) => log('chatUpdate: ' + JSON.stringify(data)));
+      socket.on('newMessage', (data) => log('newMessage: ' + JSON.stringify(data), 'success'));
+      socket.on('messageSent', (data) => log('messageSent: ' + JSON.stringify(data)));
+      socket.on('ackReceived', (data) => log('ackReceived: ' + JSON.stringify(data)));
+      socket.on('error', (data) => log('error: ' + JSON.stringify(data), 'error'));
+    }
+
+    function disconnect() {
+      if (socket) socket.disconnect();
+      socket = null;
+      updateStatus(false);
+    }
+
+    function createChat() {
+      if (!socket || !socket.connected) { log('Not connected', 'error'); return; }
+      const participants = document.getElementById('createParticipants').value.split(',').map(s => s.trim()).filter(Boolean);
+      const name = document.getElementById('chatName').value.trim();
+      socket.emit('createChat', { participants, name }, (res) => {
+        if (res?.error) log('createChat error: ' + res.error, 'error');
+        else log('createChat response: ' + JSON.stringify(res));
+      });
+    }
+
+    function sendMessage() {
+      if (!socket || !socket.connected) { log('Not connected', 'error'); return; }
+      const chatId = document.getElementById('sendChatId').value.trim();
+      const message = document.getElementById('messageContent').value.trim();
+      if (!chatId || !message) { log('Chat ID and message required', 'error'); return; }
+      socket.emit('sendMessage', { chatId, message, attachments: [] }, (res) => {
+        if (res === 'FAILURE') log('sendMessage failed', 'error');
+        else log('sendMessage: ' + res);
+      });
+    }
+
+    function getUndelivered() {
+      if (!socket || !socket.connected) { log('Not connected', 'error'); return; }
+      socket.emit('getUndeliveredMessages', {}, (res) => {
+        log('getUndeliveredMessages: ' + JSON.stringify(res));
+      });
+    }
+  </script>
+</body>
+</html>
