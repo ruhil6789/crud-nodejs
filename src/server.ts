@@ -13,11 +13,12 @@ import userRoutes from "./routes/userRoutes";
 import chatRoutes from "./routes/chatRoutes";
 import attachmentRoutes from "./routes/attachmentRoutes";
 import { setupSocketServer } from "./socket";
+import { setupSwagger } from "./config/swagger";
 
 // Load environment variables
 dotenv.config();
 
-const app: Application = express();
+const app = express();
 const PORT = process.env.PORT || 3002;
 const httpServer = http.createServer(app);
 
@@ -32,6 +33,10 @@ app.use(express.urlencoded({ extended: true })); // Parse URL-encoded bodies
 app.use("/uploads", express.static(path.join(process.cwd(), "uploads")));
 app.use("/public", express.static(path.join(process.cwd(), "public")));
 app.get("/chat", (_req, res) => res.sendFile(path.join(process.cwd(), "public", "index.html")));
+
+// Swagger API docs (before rate limiter so docs always load)
+setupSwagger(app);
+app.get("/docs", (_req, res) => res.redirect(301, "/api-docs"));
 
 // Apply rate limiting to all routes
 app.use(rateLimiter);
@@ -79,16 +84,24 @@ const startServer = async (): Promise<void> => {
     }
 
     let pubClient, subClient;
-    try {
-      await connectRedis();
+    const useRedis = !!(process.env.REDIS_URL || process.env.REDIS_PASSWORD);
+    if (useRedis) {
+      try {
+        await connectRedis();
+        initializeRateLimiters();
+        console.log("✅ Rate limiters initialized (Redis)");
+        const clients = await createRedisPubSubClients();
+        pubClient = clients.pubClient;
+        subClient = clients.subClient;
+      } catch (error) {
+        console.warn("⚠️  Redis connection failed:", (error as Error).message);
+        console.warn("   Using in-memory rate limiting. Set REDIS_URL or REDIS_PASSWORD for Redis.");
+        initializeRateLimiters();
+      }
+    } else {
       initializeRateLimiters();
-      console.log("✅ Rate limiters initialized");
-
-      const clients = await createRedisPubSubClients();
-      pubClient = clients.pubClient;
-      subClient = clients.subClient;
-    } catch (error) {
-      console.warn("⚠️  Redis connection failed, rate limiting and Socket.io pub/sub will be disabled");
+      console.log("✅ Rate limiters initialized (in-memory)");
+      console.log("   Set REDIS_URL or REDIS_PASSWORD in .env to use Redis");
     }
 
     setupSocketServer(httpServer, pubClient, subClient);
@@ -98,6 +111,7 @@ const startServer = async (): Promise<void> => {
       console.log(`🚀 Server is running on port ${PORT}`);
       console.log(`📍 Environment: ${process.env.NODE_ENV || "development"}`);
       console.log(`🌐 Health check: http://localhost:${PORT}/health`);
+      console.log(`📚 Swagger docs: http://localhost:${PORT}/api-docs`);
       console.log(`🔌 WebSocket: ws://localhost:${PORT}`);
     });
   } catch (error) {

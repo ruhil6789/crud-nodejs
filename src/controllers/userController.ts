@@ -4,6 +4,32 @@ import { redisClient } from "../config/redis";
 
 const CACHE_TTL = 300; // 5 minutes
 
+const safeRedisGet = async (key: string): Promise<string | null> => {
+  try {
+    return await redisClient.get(key);
+  } catch {
+    return null;
+  }
+};
+
+const safeRedisSetEx = async (key: string, ttl: number, value: string): Promise<void> => {
+  try {
+    await redisClient.setEx(key, ttl, value);
+  } catch {
+    // ignore
+  }
+};
+
+const safeRedisDel = async (...keys: string[]): Promise<void> => {
+  try {
+    for (const key of keys) {
+      await redisClient.del(key);
+    }
+  } catch {
+    // ignore
+  }
+};
+
 export const createUser = async (
   req: Request,
   res: Response,
@@ -23,8 +49,7 @@ export const createUser = async (
 
     const user = await User.create({ name, email, age });
 
-    // Invalidate users list cache
-    await redisClient.del("users:all");
+    await safeRedisDel("users:all");
 
     res.status(201).json({
       success: true,
@@ -41,9 +66,7 @@ export const getUsers = async (
   next: NextFunction
 ): Promise<void> => {
   try {
-    // Try to get from cache
-    const cachedUsers = await redisClient.get("users:all");
-    
+    const cachedUsers = await safeRedisGet("users:all");
     if (cachedUsers) {
       res.status(200).json({
         success: true,
@@ -53,11 +76,8 @@ export const getUsers = async (
       return;
     }
 
-    // If not in cache, fetch from DB
     const users = await User.find().sort({ createdAt: -1 });
-
-    // Store in cache
-    await redisClient.setEx("users:all", CACHE_TTL, JSON.stringify(users));
+    await safeRedisSetEx("users:all", CACHE_TTL, JSON.stringify(users));
 
     res.status(200).json({
       success: true,
@@ -77,10 +97,8 @@ export const getUserById = async (
   try {
     const { id } = req.params;
 
-    // Try cache first
     const cacheKey = `user:${id}`;
-    const cachedUser = await redisClient.get(cacheKey);
-
+    const cachedUser = await safeRedisGet(cacheKey);
     if (cachedUser) {
       res.status(200).json({
         success: true,
@@ -91,7 +109,6 @@ export const getUserById = async (
     }
 
     const user = await User.findById(id);
-
     if (!user) {
       res.status(404).json({
         success: false,
@@ -100,8 +117,7 @@ export const getUserById = async (
       return;
     }
 
-    // Cache the user
-    await redisClient.setEx(cacheKey, CACHE_TTL, JSON.stringify(user));
+    await safeRedisSetEx(cacheKey, CACHE_TTL, JSON.stringify(user));
 
     res.status(200).json({
       success: true,
@@ -136,10 +152,7 @@ export const updateUser = async (
       return;
     }
 
-    // Invalidate cache
-    await redisClient.del(`user:${id}`);
-    await redisClient.del("users:all");
-
+    await safeRedisDel(`user:${id}`, "users:all");
     res.status(200).json({
       success: true,
       data: user,
@@ -167,10 +180,7 @@ export const deleteUser = async (
       return;
     }
 
-    // Invalidate cache
-    await redisClient.del(`user:${id}`);
-    await redisClient.del("users:all");
-
+    await safeRedisDel(`user:${id}`, "users:all");
     res.status(200).json({
       success: true,
       message: "User deleted successfully",
