@@ -36,6 +36,6 @@ const userSchema = new Schema<IUser>(
   }
 );
 
-userSchema.index({ email: 1 });
+// email index is created automatically by unique: true
 
 export const User = mongoose.model<IUser>("User", userSchema);

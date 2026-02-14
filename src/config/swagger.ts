@@ -1,6 +1,12 @@
 import { Express, Request, Response } from "express";
 import swaggerUi from "swagger-ui-express";
 
+const getBaseUrl = (req: Request) => {
+  const protocol = req.headers["x-forwarded-proto"] || req.protocol || "http";
+  const host = req.headers["x-forwarded-host"] || req.get("host") || "localhost:3002";
+  return `${protocol}://${host}`;
+};
+
 const swaggerDocument = {
   openapi: "3.0.0",
   info: {
@@ -9,8 +15,8 @@ const swaggerDocument = {
     description: "REST API with Users, Chats, Messages, and Attachments. Rate limited. Uses MongoDB, Redis.",
   },
   servers: [
+    { url: "/", description: "Current server (auto-detected)" },
     { url: "http://localhost:3002", description: "Local" },
-    { url: "/", description: "Current host" },
   ],
   tags: [
     { name: "Health", description: "Health check endpoints" },
@@ -349,11 +355,15 @@ const swaggerDocument = {
 };
 
 export const setupSwagger = (app: Express, basePath = "/api-docs"): void => {
-  app.use(basePath, swaggerUi.serve, swaggerUi.setup(swaggerDocument, {
-    customCss: ".swagger-ui .topbar { display: none }",
-  }));
-  app.get(`${basePath}.json`, (_req: Request, res: Response) => {
+  // JSON spec with dynamic server URL (uses request host so "Try it out" works on any server)
+  app.get(`${basePath}.json`, (req: Request, res: Response) => {
+    const doc = JSON.parse(JSON.stringify(swaggerDocument));
+    doc.servers = [{ url: getBaseUrl(req), description: "This server" }];
     res.setHeader("Content-Type", "application/json");
-    res.send(swaggerDocument);
+    res.json(doc);
   });
+  app.use(basePath, swaggerUi.serve, swaggerUi.setup(null, {
+    customCss: ".swagger-ui .topbar { display: none }",
+    swaggerOptions: { url: `${basePath}.json` },
+  }));
 };
