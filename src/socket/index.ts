@@ -16,6 +16,7 @@ export interface AuthenticatedSocket extends Socket {
   clientId?: string;
 }
 
+
 export const setupSocketServer = (
   httpServer: HttpServer,
   pubClient?: Awaited<ReturnType<typeof import("../config/redis").createRedisPubSubClients>>["pubClient"],
