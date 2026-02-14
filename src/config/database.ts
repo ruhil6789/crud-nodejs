@@ -1,9 +1,25 @@
 import mongoose from "mongoose";
 
+const buildMongoUri = (): string => {
+  if (process.env.MONGODB_URI) return process.env.MONGODB_URI;
+
+  const host = process.env.MONGODB_HOST || "localhost";
+  const port = process.env.MONGODB_PORT || "27017";
+  const database = process.env.MONGODB_DATABASE || "crud-app";
+  const username = process.env.MONGODB_USERNAME;
+  const password = process.env.MONGODB_PASSWORD;
+  const authSource = process.env.MONGODB_AUTH_SOURCE || "admin";
+
+  if (username && password) {
+    return `mongodb://${encodeURIComponent(username)}:${encodeURIComponent(password)}@${host}:${port}/${database}?authSource=${authSource}`;
+  }
+  return `mongodb://${host}:${port}/${database}`;
+};
+
 export const connectDB = async (): Promise<void> => {
-  const mongoUri = process.env.MONGODB_URI || "mongodb://localhost:27017/crud-app";
+  const mongoUri = buildMongoUri();
   
-  console.log(`Attempting to connect to MongoDB at: ${mongoUri}`);
+  console.log(`Attempting to connect to MongoDB at: ${mongoUri.replace(/:[^:@]+@/, ":***@")}`);
   
   await mongoose.connect(mongoUri, {
     serverSelectionTimeoutMS: 10000,

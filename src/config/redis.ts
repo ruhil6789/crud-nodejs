@@ -2,12 +2,14 @@ import { createClient } from "redis";
 
 const redisHost = process.env.REDIS_HOST || "localhost";
 const redisPort = parseInt(process.env.REDIS_PORT || "6379");
+const password = process.env.REDIS_PASSWORD;
 
 export const redisClient = createClient({
   socket: {
     host: redisHost,
-    port: redisPort,
+    port: redisPort
   },
+  password: password,
 });
 
 export const createRedisPubSubClients = async () => {
