@@ -18,16 +18,18 @@ const buildMongoUri = (): string => {
 
 export const connectDB = async (): Promise<void> => {
   const mongoUri = buildMongoUri();
-  
+
   console.log(`Attempting to connect to MongoDB at: ${mongoUri.replace(/:[^:@]+@/, ":***@")}`);
-  
+
+  const isSrv = mongoUri.startsWith("mongodb+srv://");
+
   await mongoose.connect(mongoUri, {
     serverSelectionTimeoutMS: 10000,
     connectTimeoutMS: 10000,
     socketTimeoutMS: 10000,
-    directConnection: true,
+    directConnection: !isSrv,
   });
-  
+
   console.log("✅ MongoDB connected successfully");
 };
 

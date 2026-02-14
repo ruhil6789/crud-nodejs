@@ -2,14 +2,22 @@ import { createClient } from "redis";
 
 const redisHost = process.env.REDIS_HOST || "localhost";
 const redisPort = parseInt(process.env.REDIS_PORT || "6379");
-const password = process.env.REDIS_PASSWORD;
+const password = process.env.REDIS_PASSWORD || undefined;
+const useTls = process.env.REDIS_TLS === "true";
+
+const socketConfig: { host: string; port: number; tls?: boolean; rejectUnauthorized?: boolean } = {
+  host: redisHost.replace(/^['"]|['"]$/g, ""),
+  port: redisPort,
+};
+
+if (useTls) {
+  socketConfig.tls = true;
+  socketConfig.rejectUnauthorized = process.env.REDIS_TLS_REJECT_UNAUTHORIZED !== "false";
+}
 
 export const redisClient = createClient({
-  socket: {
-    host: redisHost,
-    port: redisPort
-  },
-  password: password,
+  socket: socketConfig,
+  password: password || undefined,
 });
 
 export const createRedisPubSubClients = async () => {
