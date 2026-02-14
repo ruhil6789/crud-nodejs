@@ -5,14 +5,14 @@ import dotenv from "dotenv";
 import cors from "cors";
 import helmet from "helmet";
 import morgan from "morgan";
-import { connectDB } from "./config/database.js";
-import { connectRedis, createRedisPubSubClients } from "./config/redis.js";
-import { rateLimiter, initializeRateLimiters } from "./middleware/rateLimiter.js";
-import { errorHandler, notFoundHandler } from "./middleware/errorHandler.js";
-import userRoutes from "./routes/userRoutes.js";
+import { connectDB } from "./config/database";
+import { connectRedis, createRedisPubSubClients } from "./config/redis";
+import { rateLimiter, initializeRateLimiters } from "./middleware/rateLimiter";
+import { errorHandler, notFoundHandler } from "./middleware/errorHandler";
+import userRoutes from "./routes/userRoutes";
 import chatRoutes from "./routes/chatRoutes";
 import attachmentRoutes from "./routes/attachmentRoutes";
-// import { setupSocketServer } from "./socket";
+import { setupSocketServer } from "./socket";
 
 // Load environment variables
 dotenv.config();
@@ -72,6 +72,8 @@ const startServer = async (): Promise<void> => {
     // Try to connect to MongoDB
     try {
       await connectDB();
+      const { seedDatabase } = await import("./seed/seedData");
+      await seedDatabase();
     } catch (error) {
       console.warn("⚠️  MongoDB connection failed, starting server anyway");
     }
@@ -89,7 +91,7 @@ const startServer = async (): Promise<void> => {
       console.warn("⚠️  Redis connection failed, rate limiting and Socket.io pub/sub will be disabled");
     }
 
-    // setupSocketServer(httpServer, pubClient, subClient);
+    setupSocketServer(httpServer, pubClient, subClient);
     console.log("✅ WebSocket server initialized");
 
     httpServer.listen(PORT, () => {
