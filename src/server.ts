@@ -12,7 +12,7 @@ import { errorHandler, notFoundHandler } from "./middleware/errorHandler.js";
 import userRoutes from "./routes/userRoutes.js";
 import chatRoutes from "./routes/chatRoutes";
 import attachmentRoutes from "./routes/attachmentRoutes";
-import { setupSocketServer } from "./socket";
+// import { setupSocketServer } from "./socket";
 
 // Load environment variables
 dotenv.config();
@@ -89,7 +89,7 @@ const startServer = async (): Promise<void> => {
       console.warn("⚠️  Redis connection failed, rate limiting and Socket.io pub/sub will be disabled");
     }
 
-    setupSocketServer(httpServer, pubClient, subClient);
+    // setupSocketServer(httpServer, pubClient, subClient);
     console.log("✅ WebSocket server initialized");
 
     httpServer.listen(PORT, () => {
