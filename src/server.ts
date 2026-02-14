@@ -1,7 +1,7 @@
+import "dotenv/config"; // Load .env first (before routes that read S3_BUCKET, etc.)
 import http from "http";
 import path from "path";
 import express, { Application } from "express";
-import dotenv from "dotenv";
 import cors from "cors";
 import helmet from "helmet";
 import morgan from "morgan";
@@ -15,14 +15,18 @@ import attachmentRoutes from "./routes/attachmentRoutes";
 import { setupSocketServer } from "./socket";
 import { setupSwagger } from "./config/swagger";
 
-// Load environment variables
-dotenv.config();
-
 const app = express();
 const PORT = process.env.PORT || 3002;
 const httpServer = http.createServer(app);
 
 // Middleware
+app.use((req, _res, next) => {
+  // Normalize double slashes so //uploads/file.svg works
+  if (req.url.includes("//")) {
+    req.url = req.url.replace(/\/+/g, "/");
+  }
+  next();
+});
 app.use(helmet({ contentSecurityPolicy: false })); // Disable CSP for WebSocket
 app.use(cors()); // Enable CORS
 app.use(morgan("dev")); // HTTP request logger
@@ -102,6 +106,13 @@ const startServer = async (): Promise<void> => {
       initializeRateLimiters();
       console.log("✅ Rate limiters initialized (in-memory)");
       console.log("   Set REDIS_URL or REDIS_PASSWORD in .env to use Redis");
+    }
+
+    const { isS3Configured } = await import("./config/s3");
+    if (isS3Configured()) {
+      console.log(`📦 S3 uploads enabled (bucket: ${process.env.S3_BUCKET})`);
+    } else {
+      console.log("📁 File uploads: local ./uploads (set S3_BUCKET for S3)");
     }
 
     setupSocketServer(httpServer, pubClient, subClient);

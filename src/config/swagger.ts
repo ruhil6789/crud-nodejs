@@ -292,7 +292,9 @@ const swaggerDocument = {
                       type: "object",
                       properties: {
                         attachmentId: { type: "string" },
-                        url: { type: "string" },
+                        url: { type: "string", description: "Relative path or S3 URL" },
+                        fullUrl: { type: "string", description: "Direct URL (local uploads only)" },
+                        viewUrl: { type: "string", description: "Use this URL to view file (presigned for S3, redirects for local)" },
                         mimeType: { type: "string" },
                         size: { type: "number" },
                       },
@@ -303,6 +305,18 @@ const swaggerDocument = {
             },
           },
           400: { description: "No file or userId" },
+        },
+      },
+    },
+    "/api/attachments/{id}/view": {
+      get: {
+        tags: ["Attachments"],
+        summary: "View attachment",
+        description: "Redirects to viewable URL. For S3: presigned URL. For local: direct URL.",
+        parameters: [{ name: "id", in: "path", required: true, schema: { type: "string" } }],
+        responses: {
+          302: { description: "Redirect to file" },
+          404: { description: "Attachment not found" },
         },
       },
     },
