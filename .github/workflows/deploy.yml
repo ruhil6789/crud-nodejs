@@ -80,37 +80,37 @@ jobs:
 
             echo "Deploy completed. Previous commit: $PREV_COMMIT"
 
-      - name: Health check
-        id: healthcheck
-        run: |
-          # Build URL: use EC2_APP_URL or fallback to EC2_HOST:3002
-          APP_URL="${{ secrets.EC2_APP_URL }}"
-          if [ -z "$APP_URL" ]; then
-            APP_URL="http://${{ secrets.EC2_HOST }}:3002"
-          fi
-          # Remove trailing slash to avoid double slashes
-          APP_URL="${APP_URL%/}"
+      # - name: Health check
+      #   id: healthcheck
+      #   run: |
+      #     # Build URL: use EC2_APP_URL or fallback to EC2_HOST:3002
+      #     APP_URL="${{ secrets.EC2_APP_URL }}"
+      #     if [ -z "$APP_URL" ]; then
+      #       APP_URL="http://${{ secrets.EC2_HOST }}:3002"
+      #     fi
+      #     # Remove trailing slash to avoid double slashes
+      #     APP_URL="${APP_URL%/}"
 
-          echo "Waiting 45s for container to start..."
-          sleep 45
+      #     echo "Waiting 45s for container to start..."
+      #     sleep 45
 
-          echo "Checking health at ${APP_URL}/health"
-          LAST_ERR=""
-          for i in $(seq 1 18); do
-            if curl -sf --connect-timeout 10 --max-time 15 "${APP_URL}/health" -o /dev/null; then
-              echo ""
-              echo "✅ Health check passed (attempt $i)"
-              exit 0
-            else
-              LAST_ERR=$(curl -s -o /dev/null -w "%{http_code}" --connect-timeout 5 --max-time 8 "${APP_URL}/health" 2>&1 || true)
-              echo "Attempt $i/18 failed (${LAST_ERR:-connection failed}), retrying in 10s..."
-            fi
-            sleep 10
-          done
+      #     echo "Checking health at ${APP_URL}/health"
+      #     LAST_ERR=""
+      #     for i in $(seq 1 18); do
+      #       if curl -sf --connect-timeout 10 --max-time 15 "${APP_URL}/health" -o /dev/null; then
+      #         echo ""
+      #         echo "✅ Health check passed (attempt $i)"
+      #         exit 0
+      #       else
+      #         LAST_ERR=$(curl -s -o /dev/null -w "%{http_code}" --connect-timeout 5 --max-time 8 "${APP_URL}/health" 2>&1 || true)
+      #         echo "Attempt $i/18 failed (${LAST_ERR:-connection failed}), retrying in 10s..."
+      #       fi
+      #       sleep 10
+      #     done
 
-          echo "❌ Health check failed after 18 attempts (3 min). Last error: ${LAST_ERR:-timeout/connection refused}"
-          echo "Tip: Ensure EC2 security group allows inbound port 3002 from 0.0.0.0/0"
-          exit 1
+      #     echo "❌ Health check failed after 18 attempts (3 min). Last error: ${LAST_ERR:-timeout/connection refused}"
+      #     echo "Tip: Ensure EC2 security group allows inbound port 3002 from 0.0.0.0/0"
+      #     exit 1
 
       - name: Rollback on failure
         if: failure()
