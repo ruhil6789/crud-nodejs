@@ -34,3 +34,6 @@ Thumbs.db
 
 # Uploads
 uploads/
+
+# Deploy state (created on server during deploy)
+.deploy_prev_commit

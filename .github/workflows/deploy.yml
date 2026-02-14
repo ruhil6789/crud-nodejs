@@ -1,27 +1,130 @@
-name: Deploy API BACKEND to QA
+name: Deploy API Backend to QA
 
 on:
   push:
     branches:
       - qa
 
-jobs:
-  deploy:
-    runs-on: ubuntu-latest
+env:
+  NODE_VERSION: "22"
 
+jobs:
+  # ─────────────────────────────────────────────────────────────────
+  # Job 1: Automated Testing (must pass before deploy)
+  # ─────────────────────────────────────────────────────────────────
+  test:
+    name: Test & Build
+    runs-on: ubuntu-latest
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Deploy to EC2 via SSH
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: "npm"
+
+      - name: Install dependencies
+        run: npm ci
+        env:
+          CI: true
+
+      - name: Run tests
+        run: npm test
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-${{ github.sha }}
+          path: |
+            dist/
+            package.json
+            package-lock.json
+          retention-days: 7
+
+  # ─────────────────────────────────────────────────────────────────
+  # Job 2: Deploy to EC2
+  # ─────────────────────────────────────────────────────────────────
+  deploy:
+    name: Deploy
+    needs: test
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Deploy to EC2
+        id: deploy
         uses: appleboy/ssh-action@v1.0.3
         with:
           host: ${{ secrets.EC2_HOST }}
           username: ${{ secrets.EC2_USER }}
           key: ${{ secrets.EC2_SSH_KEY }}
           port: 22
+          script_timeout: 5m
+          command_timeout: 10m
           script: |
+            set -e
             cd /home/ubuntu/crud-nodejs
-            git pull origin qa
-            docker-compose down
+
+            # Save current commit for rollback
+            PREV_COMMIT=$(git rev-parse HEAD)
+            echo "$PREV_COMMIT" > .deploy_prev_commit
+
+            # Pull and deploy
+            git fetch origin qa
+            git reset --hard origin/qa
+            docker-compose down || true
             docker-compose up -d --build
+
+            echo "Deploy completed. Previous commit: $PREV_COMMIT"
+
+      - name: Health check
+        id: healthcheck
+        run: |
+          APP_URL="${{ secrets.EC2_APP_URL }}"
+          if [ -z "$APP_URL" ]; then
+            APP_URL="http://${{ secrets.EC2_HOST }}:3002"
+          fi
+
+          echo "Checking health at $APP_URL/health"
+          for i in $(seq 1 18); do
+            if curl -sf --connect-timeout 5 --max-time 10 "${APP_URL}/health" > /dev/null; then
+              echo "✅ Health check passed (attempt $i)"
+              exit 0
+            fi
+            echo "Attempt $i/18 failed, retrying in 10s..."
+            sleep 10
+          done
+
+          echo "❌ Health check failed after 18 attempts (3 minutes)"
+          exit 1
+
+      - name: Rollback on failure
+        if: failure()
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ${{ secrets.EC2_USER }}
+          key: ${{ secrets.EC2_SSH_KEY }}
+          port: 22
+          script_timeout: 5m
+          script: |
+            set -e
+            cd /home/ubuntu/crud-nodejs
+
+            if [ -f .deploy_prev_commit ]; then
+              PREV=$(cat .deploy_prev_commit)
+              echo "🔄 Rolling back to commit $PREV"
+              git fetch origin qa
+              git reset --hard "$PREV"
+              docker-compose down
+              docker-compose up -d --build
+              echo "✅ Rollback completed"
+            else
+              echo "⚠️ No previous commit found, manual rollback may be required"
+              docker-compose down || true
+              exit 1
+            fi
+
