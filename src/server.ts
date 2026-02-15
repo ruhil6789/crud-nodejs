@@ -14,6 +14,7 @@ import chatRoutes from "./routes/chatRoutes";
 import attachmentRoutes from "./routes/attachmentRoutes";
 import { setupSocketServer } from "./socket";
 import { setupSwagger } from "./config/swagger";
+import { metricsMiddleware, metricsEndpoint } from "./config/metrics";
 
 const app = express();
 const PORT = process.env.PORT || 3002;
@@ -42,8 +43,14 @@ app.get("/chat", (_req, res) => res.sendFile(path.join(process.cwd(), "public", 
 setupSwagger(app);
 app.get("/docs", (_req, res) => res.redirect(301, "/api-docs"));
 
+// Prometheus metrics (before rate limiter so scrape is never blocked)
+app.get("/metrics", metricsEndpoint);
+
 // Apply rate limiting to all routes
 app.use(rateLimiter);
+
+// Prometheus request metrics
+app.use(metricsMiddleware);
 
 // Health check endpoint
 app.get("/", (req, res) => {
@@ -123,6 +130,7 @@ const startServer = async (): Promise<void> => {
       console.log(`📍 Environment: ${process.env.NODE_ENV || "development"}`);
       console.log(`🌐 Health check: http://localhost:${PORT}/health`);
       console.log(`📚 Swagger docs: http://localhost:${PORT}/api-docs`);
+      console.log(`📊 Prometheus metrics: http://localhost:${PORT}/metrics`);
       console.log(`🔌 WebSocket: ws://localhost:${PORT}`);
     });
   } catch (error) {

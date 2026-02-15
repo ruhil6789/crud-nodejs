@@ -32,6 +32,14 @@ const swaggerDocument = {
         responses: { 200: { description: "API running" } },
       },
     },
+    "/metrics": {
+      get: {
+        tags: ["Health"],
+        summary: "Prometheus metrics",
+        description: "Returns metrics in Prometheus exposition format",
+        responses: { 200: { description: "Metrics (text/plain)" } },
+      },
+    },
     "/health": {
       get: {
         tags: ["Health"],
