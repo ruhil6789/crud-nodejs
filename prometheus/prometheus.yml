@@ -1,0 +1,42 @@
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+
+# Alertmanager configuration (optional)
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets: []
+
+# Rule files (optional)
+rule_files: []
+
+scrape_configs:
+  # Prometheus self-monitoring
+  - job_name: "prometheus"
+    static_configs:
+      - targets: ["localhost:9090"]
+
+  # Node.js app (prom-client metrics at /metrics)
+  - job_name: "crud-api"
+    static_configs:
+      - targets: ["app:3002"]
+    metrics_path: /metrics
+    # Use service name 'app' - works when Prometheus runs in same Docker network
+
+  # Redis Exporter
+  - job_name: "redis"
+    static_configs:
+      - targets: ["redis-exporter:9121"]
+    metrics_path: /metrics
+
+# Optional: Add when running these exporters (e.g. on host or separately)
+# - job_name: "node_exporter"
+#   static_configs:
+#     - targets: ["host.docker.internal:9100"]  # Docker Desktop
+# - job_name: "mongodb"
+#   static_configs:
+#     - targets: ["localhost:9216"]
+# - job_name: "cadvisor"
+#   static_configs:
+#     - targets: ["cadvisor:8080"]

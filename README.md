@@ -464,6 +464,17 @@ services:
 
 ---
 
+## Server Deployment
+
+See [docs/SERVER_DEPLOYMENT.md](./docs/SERVER_DEPLOYMENT.md) for:
+
+- EC2 security group ports (3002, 3001, 9090)
+- .env setup on server
+- GitHub Actions deploy (push to `qa`)
+- Grafana datasource config on server
+
+---
+
 ## Production Deployment
 
 ### Checklist
