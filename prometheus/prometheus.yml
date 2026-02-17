@@ -20,15 +20,20 @@ scrape_configs:
   # Node.js app (prom-client metrics at /metrics)
   - job_name: "crud-api"
     static_configs:
-      - targets: ["app:3002"]
+      # - targets: ["app:3002"]
+        - targets: ["172.21.0.1:3002"]  # host gateway instead of app:3002
     metrics_path: /metrics
+    # scrape_timeout: 30s    # add this
     # Use service name 'app' - works when Prometheus runs in same Docker network
 
   # Redis Exporter
   - job_name: "redis"
     static_configs:
-      - targets: ["redis-exporter:9121"]
+      # - targets: ["redis-exporter:9121"]
+      - targets: ["172.21.0.1:9121"]  # host gateway instead of redis-exporter:9121
     metrics_path: /metrics
+    scrape_interval: 60s   # must be greater than scrape_timeout
+    scrape_timeout: 45s
 
 # Optional: Add when running these exporters (e.g. on host or separately)
 # - job_name: "node_exporter"
