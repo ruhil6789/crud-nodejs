@@ -99,7 +99,7 @@ services:
     container_name: grafana
     restart: unless-stopped
     ports:
-      - "3001:3000"
+      - "3001:3000"  # Changed from 3001 (conflicts with Next.js dev server)
     environment:
       - GF_SECURITY_ADMIN_PASSWORD=admin  # Change this!
       # Removed GF_INSTALL_PLUGINS - was causing crash when network times out
