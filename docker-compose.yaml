@@ -82,7 +82,7 @@ services:
       - '--storage.tsdb.path=/prometheus'
       - '--storage.tsdb.retention.time=15d'
     ports:
-      - "9090:9090"
+      - "9091:9090"
     networks:
       - monitoring-network
     depends_on:
