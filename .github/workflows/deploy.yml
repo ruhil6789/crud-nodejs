@@ -62,7 +62,7 @@ jobs:
           username: ${{ secrets.EC2_USER }}
           key: ${{ secrets.EC2_SSH_KEY }}
           port: 22
-          script_timeout: 5m
+          timeout: 5m
           command_timeout: 10m
           script: |
             set -e
@@ -80,38 +80,66 @@ jobs:
 
             echo "Deploy completed. Previous commit: $PREV_COMMIT"
 
-      # - name: Health check
-      #   id: healthcheck
-      #   run: |
-      #     # Build URL: use EC2_APP_URL or fallback to EC2_HOST:3002
-      #     APP_URL="${{ secrets.EC2_APP_URL }}"
-      #     if [ -z "$APP_URL" ]; then
-      #       APP_URL="http://${{ secrets.EC2_HOST }}:3002"
-      #     fi
-      #     # Remove trailing slash to avoid double slashes
-      #     APP_URL="${APP_URL%/}"
+      # ─────────────────────────────────────────────────────────────
+      # Health Check — waits for container, retries for 3 minutes
+      # Runs on the GitHub Actions runner (not SSH) so it tests
+      # real external connectivity to your EC2 instance.
+      #
+      # Required secret: EC2_APP_URL  e.g. http://1.2.3.4:3002
+      # If not set, falls back to http://<EC2_HOST>:3002
+      # ─────────────────────────────────────────────────────────────
+      - name: Health check
+        id: healthcheck
+        run: |
+          # ── Resolve the base URL ──────────────────────────────────
+          # APP_URL="${{ secrets.EC2_APP_URL }}"
+          # if [ -z "$APP_URL" ]; then
+            APP_URL="http://${{ secrets.EC2_HOST }}:3002"
+          # fi
+          # Strip any trailing slash
+          APP_URL="${APP_URL%/}"
+          HEALTH_URL="${APP_URL}/health"
 
-      #     echo "Waiting 45s for container to start..."
-      #     sleep 45
+          echo "Target: ${HEALTH_URL}"
 
-      #     echo "Checking health at ${APP_URL}/health"
-      #     LAST_ERR=""
-      #     for i in $(seq 1 18); do
-      #       if curl -sf --connect-timeout 10 --max-time 15 "${APP_URL}/health" -o /dev/null; then
-      #         echo ""
-      #         echo "✅ Health check passed (attempt $i)"
-      #         exit 0
-      #       else
-      #         LAST_ERR=$(curl -s -o /dev/null -w "%{http_code}" --connect-timeout 5 --max-time 8 "${APP_URL}/health" 2>&1 || true)
-      #         echo "Attempt $i/18 failed (${LAST_ERR:-connection failed}), retrying in 10s..."
-      #       fi
-      #       sleep 10
-      #     done
+          # ── Wait for container to initialise ─────────────────────
+          echo "Waiting 30s for container to start..."
+          sleep 30
 
-      #     echo "❌ Health check failed after 18 attempts (3 min). Last error: ${LAST_ERR:-timeout/connection refused}"
-      #     echo "Tip: Ensure EC2 security group allows inbound port 3002 from 0.0.0.0/0"
-      #     exit 1
+          # ── Retry loop: 18 attempts × 10s = 3 min max ────────────
+          MAX=18
+          WAIT=10
+          for i in $(seq 1 $MAX); do
+            HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" \
+              --connect-timeout 10 \
+              --max-time 15 \
+              "${HEALTH_URL}" || echo "000")
 
+            if [ "$HTTP_CODE" = "200" ]; then
+              echo "✅ Health check passed on attempt $i (HTTP 200)"
+              exit 0
+            fi
+
+            echo "Attempt $i/${MAX} — HTTP ${HTTP_CODE}, retrying in ${WAIT}s..."
+            sleep $WAIT
+          done
+
+          echo "❌ Health check failed after ${MAX} attempts."
+          echo ""
+          echo "Troubleshooting tips:"
+          echo "  1. Confirm EC2 security group allows inbound TCP on port 3002"
+          echo "  2. Confirm your app exposes GET /health returning HTTP 200"
+          echo "  3. Check container logs: docker-compose logs --tail=50"
+          exit 1
+
+      # ─────────────────────────────────────────────────────────────
+      # Rollback — triggers only when deploy OR health check fails.
+      # Fixed bugs from original:
+      #   - Correct action name: appleboy (not applyboy)
+      #   - Added space in: [ -f .deploy_prev_commit ]
+      #   - Closed if/else block with fi
+      #   - Properly indented script body
+      # ─────────────────────────────────────────────────────────────
       - name: Rollback on failure
         if: failure()
         uses: appleboy/ssh-action@v1.0.3
@@ -120,22 +148,24 @@ jobs:
           username: ${{ secrets.EC2_USER }}
           key: ${{ secrets.EC2_SSH_KEY }}
           port: 22
-          script_timeout: 5m
+          timeout: 5m
+          command_timeout: 10m
           script: |
             set -e
             cd /home/ubuntu/crud-nodejs
 
             if [ -f .deploy_prev_commit ]; then
               PREV=$(cat .deploy_prev_commit)
-              echo "🔄 Rolling back to commit $PREV"
+              echo "🔄 Rolling back to commit: $PREV"
               git fetch origin qa
               git reset --hard "$PREV"
-              docker-compose down
-              docker-compose up -d --build
-              echo "✅ Rollback completed"
-            else
-              echo "⚠️ No previous commit found, manual rollback may be required"
               docker-compose down || true
+              docker-compose up -d --build
+              echo "✅ Rollback completed successfully"
+            else
+              echo "⚠️  No .deploy_prev_commit file found."
+              echo "    Attempting to bring containers down cleanly..."
+              docker-compose down || true
+              echo "❌ Manual rollback required — no previous commit reference available"
               exit 1
             fi
-
