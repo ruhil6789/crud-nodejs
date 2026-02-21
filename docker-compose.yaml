@@ -1,11 +1,159 @@
+# version: "3.8"
+
+# services:
+#   # Your existing app service
+#   app:
+#     build: .
+#     ports:
+#       - "3002:3002"
+#     env_file:
+#       - .env
+#     environment:
+#       # Override for Docker: app container connects to Redis by service name
+#       - REDIS_HOST=redis
+#       - REDIS_PORT=6379
+#     depends_on:
+#       - redis
+#     restart: always
+#     networks:
+#       - monitoring-network
+#     # Optional: Add resource limits
+#     deploy:
+#       resources:
+#         limits:
+#           cpus: '0.5'
+#           memory: 512M
+
+#   # Redis service
+#   redis:
+#     image: redis:7-alpine
+#     container_name: redis
+#     restart: unless-stopped
+#     ports:
+#       - "6380:6379"  # Host 6380 to avoid conflict with existing Redis on 6379
+#     volumes:
+#       - redis-data:/data
+#     command: redis-server --appendonly yes
+#     networks:
+#       - monitoring-network
+#     # Optional: Add health check
+#     healthcheck:
+#       test: ["CMD", "redis-cli", "ping"]
+#       interval: 10s
+#       timeout: 5s
+#       retries: 5
+#     deploy:
+#       resources:
+#         limits:
+#           cpus: '0.2'
+#           memory: 256M
+
+#   # Redis Exporter for metrics
+#   redis-exporter:
+#     image: oliver006/redis_exporter:latest
+#     container_name: redis-exporter
+#     restart: unless-stopped
+#     environment:
+#       - REDIS_ADDR=redis:6379
+#     ports:
+#       - "9121:9121"
+#     depends_on:
+#       - redis
+#     networks:
+#       - monitoring-network
+#     deploy:
+#       resources:
+#         limits:
+#           cpus: '0.1'
+#           memory: 128M
+
+#   # Prometheus for metrics collection
+#   prometheus:
+#     build:
+#       context: .
+#       dockerfile: prometheus/Dockerfile
+#     image: github-prometheus:latest
+#     container_name: prometheus
+#     restart: unless-stopped
+#     volumes:
+#       - prometheus-data:/prometheus
+#     command:
+#       - '--config.file=/etc/prometheus/prometheus.yml'
+#       - '--storage.tsdb.path=/prometheus'
+#       - '--storage.tsdb.retention.time=15d'
+#     ports:
+#       - "9090:9090"
+#     networks:
+#       - monitoring-network
+#     depends_on:
+#       - redis-exporter
+#     deploy:
+#       resources:
+#         limits:
+#           cpus: '0.3'
+#           memory: 512M
+
+#   # Optional: Grafana for nice dashboards
+#   grafana:
+#     image: grafana/grafana:latest
+#     container_name: grafana
+#     restart: unless-stopped
+#     ports:
+#       - "3001:3000"  # Changed from 3001 (conflicts with Next.js dev server)
+#     environment:
+#       - GF_SECURITY_ADMIN_PASSWORD=admin  # Change this!
+#       # Removed GF_INSTALL_PLUGINS - was causing crash when network times out
+#     volumes:
+#       - grafana-data:/var/lib/grafana
+#     depends_on:
+#       - prometheus
+#     networks:
+#       - monitoring-network
+#     deploy:
+#       resources:
+#         limits:
+#           cpus: '0.2'
+#           memory: 256M
+
+#   nginx:
+#     image: nginx:alpine
+#     container_name: nginx
+#     restart: unless-stopped
+#     ports:
+#       - "80:80"
+#     volumes:
+#       - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+#       - ./nginx/conf.d:/etc/nginx/conf.d:ro
+#     depends_on:
+#       - app
+#       - grafana
+#       - prometheus
+#     networks:
+#       - monitoring-network
+
+# # Networks
+# networks:
+#   monitoring-network:
+#     driver: bridge
+
+# # Volumes for persistent data
+# volumes:
+#   redis-data:
+#   prometheus-data:
+#   grafana-data:
+
+
+
+
 version: "3.8"
 
 services:
-  # Your existing app service
+  # Your existing app service - NO PUBLIC PORTS!
   app:
     build: .
-    ports:
-      - "3002:3002"
+    # REMOVE ports section - app should NOT be publicly accessible
+    # ports:
+    #   - "3002:3002"
     env_file:
       - .env
     environment:
@@ -24,13 +172,14 @@ services:
           cpus: '0.5'
           memory: 512M
 
-  # Redis service
+  # Redis service - NO PUBLIC PORTS!
   redis:
     image: redis:7-alpine
     container_name: redis
     restart: unless-stopped
-    ports:
-      - "6380:6379"  # Host 6380 to avoid conflict with existing Redis on 6379
+    # REMOVE ports - Redis should NOT be publicly accessible
+    # ports:
+    #   - "6380:6379"  # Host 6380 to avoid conflict with existing Redis on 6379
     volumes:
       - redis-data:/data
     command: redis-server --appendonly yes
@@ -48,15 +197,16 @@ services:
           cpus: '0.2'
           memory: 256M
 
-  # Redis Exporter for metrics
+  # Redis Exporter for metrics - NO PUBLIC PORTS!
   redis-exporter:
     image: oliver006/redis_exporter:latest
     container_name: redis-exporter
     restart: unless-stopped
     environment:
       - REDIS_ADDR=redis:6379
-    ports:
-      - "9121:9121"
+    # REMOVE ports - Redis Exporter should NOT be publicly accessible
+    # ports:
+    #   - "9121:9121"
     depends_on:
       - redis
     networks:
@@ -67,7 +217,7 @@ services:
           cpus: '0.1'
           memory: 128M
 
-  # Prometheus for metrics collection
+  # Prometheus for metrics collection - NO PUBLIC PORTS!
   prometheus:
     build:
       context: .
@@ -81,8 +231,9 @@ services:
       - '--config.file=/etc/prometheus/prometheus.yml'
       - '--storage.tsdb.path=/prometheus'
       - '--storage.tsdb.retention.time=15d'
-    ports:
-      - "9090:9090"
+    # REMOVE ports - Prometheus should NOT be publicly accessible
+    # ports:
+    #   - "9090:9090"
     networks:
       - monitoring-network
     depends_on:
@@ -93,13 +244,14 @@ services:
           cpus: '0.3'
           memory: 512M
 
-  # Optional: Grafana for nice dashboards
+  # Optional: Grafana for nice dashboards - NO PUBLIC PORTS!
   grafana:
     image: grafana/grafana:latest
     container_name: grafana
     restart: unless-stopped
-    ports:
-      - "3001:3000"  # Changed from 3001 (conflicts with Next.js dev server)
+    # REMOVE ports - Grafana should NOT be publicly accessible
+    # ports:
+    #   - "3001:3000"  # Changed from 3001 (conflicts with Next.js dev server)
     environment:
       - GF_SECURITY_ADMIN_PASSWORD=admin  # Change this!
       # Removed GF_INSTALL_PLUGINS - was causing crash when network times out
@@ -115,12 +267,14 @@ services:
           cpus: '0.2'
           memory: 256M
 
+  # Nginx - ONLY service exposed to internet
   nginx:
     image: nginx:alpine
     container_name: nginx
     restart: unless-stopped
     ports:
-      - "80:80"
+      - "80:80"  # ONLY Nginx on port 80 is public
+      # - "443:443"  # Uncomment when you add HTTPS
     volumes:
       - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
       - ./nginx/conf.d:/etc/nginx/conf.d:ro
