@@ -92,9 +92,9 @@ jobs:
         id: healthcheck
         run: |
           # ── Resolve the base URL ──────────────────────────────────
-          # APP_URL="${{ secrets.EC2_APP_URL }}"
+          APP_URL="${{ secrets.EC2_APP_URL }}"
           # if [ -z "$APP_URL" ]; then
-            APP_URL="http://${{ secrets.EC2_HOST }}:3002"
+            APP_URL="http://${{ secrets.EC2_HOST }}"
           # fi
           # Strip any trailing slash
           APP_URL="${APP_URL%/}"
